@@ -1,23 +1,18 @@
 #!/usr/bin/env python3
 """
-🦜 Parakeet TDT-CTC 0.6B-ja Web UI (シンプル版)
-"""
+🦜 Parakeet TDT-CTC 0.6B-ja Web UI
+日本語音声書き起こしツール（WSL2対応版）
 
-# CUDAコンテキスト問題を回避
-import multiprocessing
-try:
-    multiprocessing.set_start_method('spawn', force=True)
-except RuntimeError:
-    pass
+※ WSL2ではCTCデコーダーを使用（CUDA Graphsを回避）
+   詳細は WSL2_CUDA_ERROR_README.md を参照
+"""
 
 from nemo.collections.asr.models import ASRModel
 import torch
 import gradio as gr
 import gc
-import shutil
 from pathlib import Path
 from pydub import AudioSegment
-import os
 import subprocess
 import datetime
 
