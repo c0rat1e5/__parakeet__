@@ -3,6 +3,13 @@
 🦜 Parakeet TDT-CTC 0.6B-ja Web UI (シンプル版)
 """
 
+# CUDAコンテキスト問題を回避
+import multiprocessing
+try:
+    multiprocessing.set_start_method('spawn', force=True)
+except RuntimeError:
+    pass
+
 from nemo.collections.asr.models import ASRModel
 import torch
 import gradio as gr
@@ -22,7 +29,8 @@ MODEL_PATH = SCRIPT_DIR / "parakeet-tdt_ctc-0.6b-ja.nemo"
 TEMP_DIR = SCRIPT_DIR / "temp"
 TEMP_DIR.mkdir(exist_ok=True)
 
-device = "cpu"
+# GPUを使用
+device = "cuda" if torch.cuda.is_available() else "cpu"
 
 # モデルをグローバルに読み込み
 print(f"🦜 モデルを読み込み中: {MODEL_PATH}")
@@ -33,6 +41,12 @@ if not MODEL_PATH.exists():
 
 model = ASRModel.restore_from(str(MODEL_PATH))
 model.eval()
+
+# GPUに移動
+if device == "cuda":
+    model = model.cuda()
+    print("   モデルをGPUに移動しました")
+
 print("✅ モデル読み込み完了\n")
 
 
