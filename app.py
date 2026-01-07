@@ -41,6 +41,12 @@ if not MODEL_PATH.exists():
 
 model = ASRModel.restore_from(str(MODEL_PATH))
 model.eval()
+
+# 起動時にモデルをGPUに移動
+if device == "cuda":
+    model = model.to(device)
+    print(f"   モデルをGPUに移動しました")
+
 print("✅ モデル読み込み完了\n")
 
 
@@ -222,10 +228,6 @@ def transcribe_audio(audio_input, session_dir):
         else:
             transcribe_path = audio_path
         
-        # モデルをGPUに移動して書き起こし
-        model.to(device)
-        model.to(torch.float32)
-        
         gr.Info(f"📝 書き起こし中... ({duration_sec:.1f}秒)", duration=3)
         
         # 長い音声の場合は最適化設定を適用
@@ -238,8 +240,7 @@ def transcribe_audio(audio_input, session_dir):
             except Exception as e:
                 print(f"Warning: Failed to apply long audio settings: {e}")
         
-        # bfloat16で推論
-        model.to(torch.bfloat16)
+        # 推論
         output = model.transcribe([transcribe_path], timestamps=True)
         
         if not output or not isinstance(output, list) or not output[0]:
@@ -313,9 +314,9 @@ def transcribe_audio(audio_input, session_dir):
                 model.change_attention_model("rel_pos")
                 model.change_subsampling_conv_chunking_factor(-1)
             
+            # GPUメモリをクリアするが、モデルはGPUに保持
+            gc.collect()
             if device == 'cuda':
-                model.cpu()
-                gc.collect()
                 torch.cuda.empty_cache()
         except Exception as e:
             print(f"Cleanup error: {e}")
