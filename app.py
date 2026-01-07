@@ -30,7 +30,10 @@ SCRIPT_DIR = Path(__file__).parent.resolve()
 MODEL_PATH = SCRIPT_DIR / "parakeet-tdt_ctc-0.6b-ja.nemo"
 TEMP_DIR = SCRIPT_DIR / "temp"
 
-device = "cuda" if torch.cuda.is_available() else "cpu"
+# CUDAエラーを回避するためCPUを使用（安定性優先）
+# GPUを使用したい場合は "cuda" に変更
+device = "cpu"
+# device = "cuda" if torch.cuda.is_available() else "cpu"
 
 # モデルをグローバルに読み込み
 print(f"🦜 モデルを読み込み中: {MODEL_PATH}")
@@ -42,9 +45,14 @@ if not MODEL_PATH.exists():
 model = ASRModel.restore_from(str(MODEL_PATH))
 model.eval()
 
-# 起動時にモデルをGPUに移動
+# 起動時にモデルをGPUに移動してウォームアップ
 if device == "cuda":
     model = model.to(device)
+    # ウォームアップ：CUDAコンテキストを初期化
+    with torch.no_grad():
+        dummy = torch.zeros(1, 16000, device=device)
+        del dummy
+        torch.cuda.empty_cache()
     print(f"   モデルをGPUに移動しました")
 
 print("✅ モデル読み込み完了\n")
