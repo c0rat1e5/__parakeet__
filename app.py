@@ -161,12 +161,12 @@ def transcribe_audio(audio_input, session_dir):
     """音声ファイルを書き起こし"""
     # gr.Fileからのパス取得（ファイルオブジェクトまたはパス文字列に対応）
     if audio_input is None:
-        gr.Error("音声ファイルが指定されていません。", duration=None)
+        print("エラー: 音声ファイルが指定されていません")
         return (
             [], [], None,
-            gr.DownloadButton(visible=False),
-            gr.DownloadButton(visible=False),
-            gr.DownloadButton(visible=False),
+            gr.update(visible=False),
+            gr.update(visible=False),
+            gr.update(visible=False),
             ""
         )
     
@@ -189,10 +189,10 @@ def transcribe_audio(audio_input, session_dir):
     original_path_name = Path(audio_path).name
     audio_name = Path(audio_path).stem
     
-    # ボタンの初期状態
-    csv_button = gr.DownloadButton(label="📥 CSV", visible=False)
-    srt_button = gr.DownloadButton(label="📥 SRT字幕", visible=False)
-    txt_button = gr.DownloadButton(label="📥 テキスト", visible=False)
+    # ボタンの初期状態（gr.update()を使用）
+    csv_button = gr.update(visible=False)
+    srt_button = gr.update(visible=False)
+    txt_button = gr.update(visible=False)
     
     long_audio_settings_applied = False
     
@@ -200,16 +200,16 @@ def transcribe_audio(audio_input, session_dir):
         # 動画ファイルの場合は音声を抽出
         video_extensions = {".mp4", ".mkv", ".avi", ".mov", ".webm", ".flv", ".wmv"}
         if Path(audio_path).suffix.lower() in video_extensions:
-            gr.Info(f"🎬 動画から音声を抽出中: {original_path_name}", duration=3)
+            print(f"🎬 動画から音声を抽出中: {original_path_name}")
             temp_audio_path = Path(session_dir) / f"{audio_name}_extracted.wav"
             if not extract_audio_from_video(audio_path, str(temp_audio_path)):
-                gr.Error("動画からの音声抽出に失敗しました。ffmpegがインストールされているか確認してください。")
-                return vis_data, raw_times_data, audio_path, csv_button, srt_button, txt_button, ""
+                print("エラー: 動画からの音声抽出に失敗しました")
+                return vis_data, raw_times_data, audio_path, gr.update(visible=False), gr.update(visible=False), gr.update(visible=False), ""
             audio_path = str(temp_audio_path)
             original_path_name = temp_audio_path.name
         
         # 音声ファイルを読み込み
-        gr.Info(f"🎵 音声を読み込み中: {original_path_name}", duration=2)
+        print(f"🍜 音声を読み込み中: {original_path_name}")
         audio = AudioSegment.from_file(audio_path)
         duration_sec = audio.duration_seconds
         
@@ -226,8 +226,8 @@ def transcribe_audio(audio_input, session_dir):
             audio = audio.set_channels(1)
             mono = True
         elif audio.channels > 2:
-            gr.Error(f"音声が{audio.channels}チャンネルです。モノラルまたはステレオのみ対応しています。")
-            return vis_data, raw_times_data, audio_path, csv_button, srt_button, txt_button, ""
+            print(f"エラー: 音声が{audio.channels}チャンネルです")
+            return vis_data, raw_times_data, audio_path, gr.update(visible=False), gr.update(visible=False), gr.update(visible=False), ""
         
         if resampled or mono:
             processed_audio_path = Path(session_dir) / f"{audio_name}_processed.wav"
@@ -236,12 +236,12 @@ def transcribe_audio(audio_input, session_dir):
         else:
             transcribe_path = audio_path
         
-        gr.Info(f"📝 書き起こし中... ({duration_sec:.1f}秒)", duration=3)
+        print(f"📝 書き起こし中... ({duration_sec:.1f}秒)")
         
         # 長い音声の場合は最適化設定を適用
         if duration_sec > 480:  # 8分以上
             try:
-                gr.Info("⚡ 長い音声のため最適化設定を適用中...", duration=3)
+                print("⚡ 長い音声のため最適化設定を適用中...")
                 model.change_attention_model("rel_pos_local_attn", [256, 256])
                 model.change_subsampling_conv_chunking_factor(1)
                 long_audio_settings_applied = True
@@ -252,8 +252,8 @@ def transcribe_audio(audio_input, session_dir):
         output = model.transcribe([transcribe_path], timestamps=True)
         
         if not output or not isinstance(output, list) or not output[0]:
-            gr.Error("書き起こしに失敗しました。")
-            return vis_data, raw_times_data, audio_path, csv_button, srt_button, txt_button, ""
+            print("エラー: 書き起こしに失敗しました")
+            return vis_data, raw_times_data, audio_path, gr.update(visible=False), gr.update(visible=False), gr.update(visible=False), ""
         
         # タイムスタンプを取得
         if hasattr(output[0], 'timestamp') and output[0].timestamp and 'segment' in output[0].timestamp:
@@ -263,6 +263,8 @@ def transcribe_audio(audio_input, session_dir):
             text = output[0].text if hasattr(output[0], 'text') else str(output[0])
             segment_timestamps = [{'start': 0.0, 'end': duration_sec, 'segment': text}]
         
+        print(f"セグメント数: {len(segment_timestamps)}")
+        
         # データ整形
         csv_headers = ["開始 (秒)", "終了 (秒)", "テキスト"]
         vis_data = [[f"{ts['start']:.2f}", f"{ts['end']:.2f}", ts['segment']] for ts in segment_timestamps]
@@ -270,6 +272,7 @@ def transcribe_audio(audio_input, session_dir):
         
         # フルテキスト
         full_text = "".join([ts['segment'] for ts in segment_timestamps])
+        print(f"フルテキスト長: {len(full_text)} 文字")
         
         # CSVファイルを保存
         try:
@@ -278,7 +281,7 @@ def transcribe_audio(audio_input, session_dir):
                 writer = csv.writer(f)
                 writer.writerow(csv_headers)
                 writer.writerows(vis_data)
-            csv_button = gr.DownloadButton(value=str(csv_file_path), visible=True, label="📥 CSV")
+            csv_button = gr.update(value=str(csv_file_path), visible=True)
         except Exception as e:
             print(f"CSV error: {e}")
         
@@ -288,7 +291,7 @@ def transcribe_audio(audio_input, session_dir):
             srt_file_path = Path(session_dir) / f"{audio_name}_transcript.srt"
             with open(srt_file_path, 'w', encoding='utf-8') as f:
                 f.write(srt_content)
-            srt_button = gr.DownloadButton(value=str(srt_file_path), visible=True, label="📥 SRT字幕")
+            srt_button = gr.update(value=str(srt_file_path), visible=True)
         except Exception as e:
             print(f"SRT error: {e}")
         
@@ -297,23 +300,33 @@ def transcribe_audio(audio_input, session_dir):
             txt_file_path = Path(session_dir) / f"{audio_name}_transcript.txt"
             with open(txt_file_path, 'w', encoding='utf-8') as f:
                 f.write(full_text)
-            txt_button = gr.DownloadButton(value=str(txt_file_path), visible=True, label="📥 テキスト")
+            txt_button = gr.update(value=str(txt_file_path), visible=True)
         except Exception as e:
             print(f"TXT error: {e}")
         
-        gr.Info("✅ 書き起こし完了！", duration=2)
-        return vis_data, raw_times_data, audio_path, csv_button, srt_button, txt_button, full_text
+        print("✅ 書き起こし完了！ 結果を返します...")
+        
+        # DataFrameの表示を最大500行に制限（ブラウザの負荷軽減）
+        MAX_DISPLAY_ROWS = 500
+        if len(vis_data) > MAX_DISPLAY_ROWS:
+            print(f"⚠️ セグメント数が多いため表示を{MAX_DISPLAY_ROWS}行に制限します（全{len(vis_data)}行はCSVでダウンロード可能）")
+            display_vis_data = vis_data[:MAX_DISPLAY_ROWS]
+            display_raw_times = raw_times_data[:MAX_DISPLAY_ROWS]
+        else:
+            display_vis_data = vis_data
+            display_raw_times = raw_times_data
+        
+        return display_vis_data, display_raw_times, audio_path, csv_button, srt_button, txt_button, full_text
     
     except torch.cuda.OutOfMemoryError:
         error_msg = 'GPUメモリ不足です。より短い音声で試してください。'
-        gr.Error(error_msg)
-        return [["OOM", "OOM", error_msg]], [[0.0, 0.0]], audio_path, csv_button, srt_button, txt_button, ""
+        print(f"OOM Error: {error_msg}")
+        return [["OOM", "OOM", error_msg]], [[0.0, 0.0]], audio_path, gr.update(visible=False), gr.update(visible=False), gr.update(visible=False), ""
     
     except Exception as e:
         error_msg = f"エラー: {e}"
         print(f"Transcription error: {e}")
-        gr.Error(error_msg)
-        return [["Error", "Error", error_msg]], [[0.0, 0.0]], audio_path, csv_button, srt_button, txt_button, ""
+        return [["Error", "Error", error_msg]], [[0.0, 0.0]], audio_path, gr.update(visible=False), gr.update(visible=False), gr.update(visible=False), ""
     
     finally:
         # クリーンアップ
