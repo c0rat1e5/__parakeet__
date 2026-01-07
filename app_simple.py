@@ -45,7 +45,11 @@ model.eval()
 # GPUに移動
 if device == "cuda":
     model = model.cuda()
-    print("   モデルをGPUに移動しました")
+    # WSL2互換性のためCTCデコーダーを使用（CUDA Graphsを回避）
+    model.cur_decoder = "ctc"
+    print("   モデルをGPUに移動しました (CTCデコーダー使用)")
+else:
+    print("   CPUモードで動作中")
 
 print("✅ モデル読み込み完了\n")
 
