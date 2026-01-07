@@ -523,7 +523,7 @@ if __name__ == "__main__":
     print(f"💻 デバイス: {device}")
     print("\n🌐 ブラウザで http://localhost:7860 を開いてください\n")
     
-    demo.queue()
+    # queue()を無効化してシンプルに起動
     demo.launch(
         server_name="0.0.0.0",
         server_port=7860,
