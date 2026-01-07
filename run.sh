@@ -1,5 +1,6 @@
 #!/bin/bash
 # Parakeet Web UI 起動スクリプト
+# ※ WSL2環境ではCTCデコーダーを使用（CUDA Graphs回避）
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$SCRIPT_DIR"
@@ -30,4 +31,4 @@ echo "🚀 アプリを起動中..."
 echo "   ブラウザで http://localhost:7860 を開いてください"
 echo ""
 
-python app.py
+python app_simple.py
