@@ -143,9 +143,10 @@ def generate_srt_content(segment_timestamps: list) -> str:
     return "\n".join(srt_content)
 
 
-def transcribe_audio(audio_path, session_dir):
+def transcribe_audio(audio_input, session_dir):
     """音声ファイルを書き起こし"""
-    if not audio_path:
+    # gr.Fileからのパス取得（ファイルオブジェクトまたはパス文字列に対応）
+    if audio_input is None:
         gr.Error("音声ファイルが指定されていません。", duration=None)
         return (
             [], [], None,
@@ -154,6 +155,14 @@ def transcribe_audio(audio_path, session_dir):
             gr.DownloadButton(visible=False),
             ""
         )
+    
+    # gr.Fileの場合はパスを取得、gr.Audioの場合はそのまま
+    if hasattr(audio_input, 'name'):
+        audio_path = audio_input.name
+    elif isinstance(audio_input, str):
+        audio_path = audio_input
+    else:
+        audio_path = str(audio_input)
     
     vis_data = [["N/A", "N/A", "処理失敗"]]
     raw_times_data = [[0.0, 0.0]]
@@ -387,10 +396,10 @@ with gr.Blocks(
     
     with gr.Tabs():
         with gr.TabItem("📁 ファイルアップロード"):
-            file_input = gr.Audio(
-                sources=["upload"], 
-                type="filepath", 
-                label="音声/動画ファイルをアップロード"
+            file_input = gr.File(
+                label="音声/動画ファイルをアップロード",
+                file_types=[".mp4", ".mkv", ".avi", ".mov", ".webm", ".flv", ".wmv", 
+                           ".wav", ".mp3", ".flac", ".ogg", ".m4a", ".aac"]
             )
             file_transcribe_btn = gr.Button("🎙️ 書き起こし開始", variant="primary", size="lg")
         
