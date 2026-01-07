@@ -115,17 +115,66 @@ def transcribe_audio(audio_input):
         
         # 書き起こし
         print(f"📝 書き起こし中... ({duration_sec:.1f}秒)")
-        output = model.transcribe([str(processed_path)], timestamps=True)
         
-        if not output or not output[0]:
-            return "❌ 書き起こしに失敗しました", None, None, None
+        # 長い音声の場合は分割処理（5分ごと）
+        MAX_CHUNK_SEC = 300  # 5分
         
-        # タイムスタンプ取得
-        if hasattr(output[0], 'timestamp') and output[0].timestamp and 'segment' in output[0].timestamp:
-            segments = output[0].timestamp['segment']
+        if duration_sec > MAX_CHUNK_SEC:
+            print(f"⚡ 長い音声のため{MAX_CHUNK_SEC}秒ごとに分割処理...")
+            all_segments = []
+            chunk_start = 0
+            chunk_idx = 0
+            
+            while chunk_start < duration_sec:
+                chunk_end = min(chunk_start + MAX_CHUNK_SEC, duration_sec)
+                print(f"   チャンク {chunk_idx + 1}: {chunk_start:.0f}秒 - {chunk_end:.0f}秒")
+                
+                # チャンクを切り出し
+                chunk_audio = audio[int(chunk_start * 1000):int(chunk_end * 1000)]
+                chunk_path = TEMP_DIR / f"{audio_name}_chunk_{chunk_idx}.wav"
+                chunk_audio.export(chunk_path, format="wav")
+                
+                # 書き起こし
+                try:
+                    output = model.transcribe([str(chunk_path)], timestamps=True)
+                    
+                    if output and output[0]:
+                        if hasattr(output[0], 'timestamp') and output[0].timestamp and 'segment' in output[0].timestamp:
+                            chunk_segments = output[0].timestamp['segment']
+                            # タイムスタンプをオフセット
+                            for seg in chunk_segments:
+                                seg['start'] += chunk_start
+                                seg['end'] += chunk_start
+                            all_segments.extend(chunk_segments)
+                        else:
+                            text = output[0].text if hasattr(output[0], 'text') else str(output[0])
+                            all_segments.append({'start': chunk_start, 'end': chunk_end, 'segment': text})
+                finally:
+                    # チャンクファイルを削除
+                    if chunk_path.exists():
+                        chunk_path.unlink()
+                    # GPUメモリをクリア
+                    gc.collect()
+                    if device == "cuda":
+                        torch.cuda.empty_cache()
+                
+                chunk_start = chunk_end
+                chunk_idx += 1
+            
+            segments = all_segments
         else:
-            text = output[0].text if hasattr(output[0], 'text') else str(output[0])
-            segments = [{'start': 0.0, 'end': duration_sec, 'segment': text}]
+            # 短い音声はそのまま処理
+            output = model.transcribe([str(processed_path)], timestamps=True)
+            
+            if not output or not output[0]:
+                return "❌ 書き起こしに失敗しました", None, None, None
+            
+            # タイムスタンプ取得
+            if hasattr(output[0], 'timestamp') and output[0].timestamp and 'segment' in output[0].timestamp:
+                segments = output[0].timestamp['segment']
+            else:
+                text = output[0].text if hasattr(output[0], 'text') else str(output[0])
+                segments = [{'start': 0.0, 'end': duration_sec, 'segment': text}]
         
         # フルテキスト
         full_text = "".join([s['segment'] for s in segments])
