@@ -314,5 +314,6 @@ if __name__ == "__main__":
     print("=" * 60)
     print("🦜 Parakeet 日本語音声書き起こし Web UI (シンプル版)")
     print("=" * 60)
+    print("\n🌐 ブラウザで http://localhost:7860 を開いてください\n")
     
     demo.launch(server_name="0.0.0.0", server_port=7860)

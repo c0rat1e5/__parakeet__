@@ -28,7 +28,6 @@ fi
 
 echo ""
 echo "🚀 アプリを起動中..."
-echo "   ブラウザで http://localhost:7860 を開いてください"
 echo ""
 
 python app_simple.py
